@@ -25,7 +25,8 @@ interface CostApiResponse {
 export async function generateAndCacheDiagram(
   username: string,
   repo: string,
-  github_pat?: string,
+  provider: string,
+  pat?: string,
   instructions?: string,
   api_key?: string,
 ): Promise<GenerateApiResponse> {
@@ -42,9 +43,11 @@ export async function generateAndCacheDiagram(
       body: JSON.stringify({
         username,
         repo,
+        provider,
         instructions: instructions ?? "",
         api_key: api_key,
-        github_pat: github_pat,
+        github_pat: provider === "github" ? pat : undefined,
+        azure_pat: provider === "azure" ? pat : undefined,
       }),
     });
 
@@ -131,8 +134,9 @@ export async function modifyAndCacheDiagram(
 export async function getCostOfGeneration(
   username: string,
   repo: string,
+  provider: string,
   instructions: string,
-  github_pat?: string,
+  pat?: string,
 ): Promise<CostApiResponse> {
   try {
     const baseUrl =
@@ -147,7 +151,9 @@ export async function getCostOfGeneration(
       body: JSON.stringify({
         username,
         repo,
-        github_pat: github_pat,
+        provider,
+        github_pat: provider === "github" ? pat : undefined,
+        azure_pat: provider === "azure" ? pat : undefined,
         instructions: instructions ?? "",
       }),
     });

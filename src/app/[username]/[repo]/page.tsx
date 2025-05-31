@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import MainCard from "~/components/main-card";
 import Loading from "~/components/loading";
 import MermaidChart from "~/components/mermaid-diagram";
@@ -13,6 +13,8 @@ import { useStarReminder } from "~/hooks/useStarReminder";
 export default function Repo() {
   const [zoomingEnabled, setZoomingEnabled] = useState(false);
   const params = useParams<{ username: string; repo: string }>();
+  const searchParams = useSearchParams();
+  const provider = searchParams.get("provider") ?? "github";
 
   // Use the star reminder hook
   useStarReminder();
@@ -32,7 +34,11 @@ export default function Repo() {
     handleOpenApiKeyDialog,
     handleExportImage,
     state,
-  } = useDiagram(params.username.toLowerCase(), params.repo.toLowerCase());
+  } = useDiagram(
+    params.username.toLowerCase(),
+    params.repo.toLowerCase(),
+    provider,
+  );
 
   return (
     <div className="flex flex-col items-center p-4">
@@ -41,6 +47,7 @@ export default function Repo() {
           isHome={false}
           username={params.username.toLowerCase()}
           repo={params.repo.toLowerCase()}
+          provider={provider}
           showCustomization={!loading && !error}
           onModify={handleModify}
           onRegenerate={handleRegenerate}

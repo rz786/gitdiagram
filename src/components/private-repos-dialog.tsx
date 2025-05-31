@@ -20,7 +20,8 @@ export function PrivateReposDialog({
   const [pat, setPat] = useState<string>("");
 
   useEffect(() => {
-    const storedPat = localStorage.getItem("github_pat");
+    const storedPat =
+      localStorage.getItem("github_pat") || localStorage.getItem("azure_pat");
     if (storedPat) {
       setPat(storedPat);
     }
@@ -34,6 +35,7 @@ export function PrivateReposDialog({
 
   const handleClear = () => {
     localStorage.removeItem("github_pat");
+    localStorage.removeItem("azure_pat");
     setPat("");
   };
 
@@ -42,13 +44,13 @@ export function PrivateReposDialog({
       <DialogContent className="border-[3px] border-black bg-purple-200 p-6 shadow-[8px_8px_0_0_#000000] sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-black">
-            Enter GitHub Personal Access Token
+            Enter Personal Access Token
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="text-sm">
-            To enable private repositories, you&apos;ll need to provide a GitHub
-            Personal Access Token with repo scope. The token will be stored
+            To enable private repositories, you&apos;ll need to provide a GitHub or
+            Azure Personal Access Token with repo scope. The token will be stored
             locally in your browser. Find out how{" "}
             <Link
               href="https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens"
@@ -79,7 +81,7 @@ export function PrivateReposDialog({
           </details>
           <Input
             type="password"
-            placeholder="ghp_..."
+            placeholder="personal access token"
             value={pat}
             onChange={(e) => setPat(e.target.value)}
             className="flex-1 rounded-md border-[3px] border-black px-3 py-2 text-base font-bold shadow-[4px_4px_0_0_#000000] placeholder:text-base placeholder:font-normal placeholder:text-gray-700"
@@ -103,7 +105,7 @@ export function PrivateReposDialog({
               </Button>
               <Button
                 type="submit"
-                disabled={!pat.startsWith("ghp_")}
+                disabled={!pat}
                 className="border-[3px] border-black bg-purple-400 px-4 py-2 text-black shadow-[4px_4px_0_0_#000000] transition-transform hover:-translate-x-0.5 hover:-translate-y-0.5 hover:bg-purple-300 disabled:opacity-50"
               >
                 Save Token

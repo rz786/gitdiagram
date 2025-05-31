@@ -17,6 +17,7 @@ interface MainCardProps {
   isHome?: boolean;
   username?: string;
   repo?: string;
+  provider?: string;
   showCustomization?: boolean;
   onModify?: (instructions: string) => void;
   onRegenerate?: (instructions: string) => void;
@@ -32,6 +33,7 @@ export default function MainCard({
   isHome = true,
   username,
   repo,
+  provider = "github",
   showCustomization,
   onModify,
   onRegenerate,
@@ -51,9 +53,13 @@ export default function MainCard({
 
   useEffect(() => {
     if (username && repo) {
-      setRepoUrl(`https://github.com/${username}/${repo}`);
+      if (provider === "azure") {
+        setRepoUrl(`https://dev.azure.com/${username}/${repo}/_git/${repo}`);
+      } else {
+        setRepoUrl(`https://github.com/${username}/${repo}`);
+      }
     }
-  }, [username, repo]);
+  }, [username, repo, provider]);
 
   useEffect(() => {
     if (loading) {
@@ -67,10 +73,17 @@ export default function MainCard({
 
     const githubUrlPattern =
       /^https?:\/\/github\.com\/([a-zA-Z0-9-_]+)\/([a-zA-Z0-9-_\.]+)\/?$/;
-    const match = githubUrlPattern.exec(repoUrl.trim());
+    const azureUrlPattern =
+      /^https?:\/\/dev\.azure\.com\/([a-zA-Z0-9-_]+)\/[^\/]+\/_git\/([a-zA-Z0-9-_\.]+)\/?$/;
+    let provider = "github";
+    let match = githubUrlPattern.exec(repoUrl.trim());
+    if (!match) {
+      match = azureUrlPattern.exec(repoUrl.trim());
+      provider = "azure";
+    }
 
     if (!match) {
-      setError("Please enter a valid GitHub repository URL");
+      setError("Please enter a valid GitHub or Azure repository URL");
       return;
     }
 
@@ -81,7 +94,9 @@ export default function MainCard({
     }
     const sanitizedUsername = encodeURIComponent(username);
     const sanitizedRepo = encodeURIComponent(repo);
-    router.push(`/${sanitizedUsername}/${sanitizedRepo}`);
+    router.push(
+      `/${sanitizedUsername}/${sanitizedRepo}?provider=${provider}`,
+    );
   };
 
   const handleExampleClick = (repoPath: string, e: React.MouseEvent) => {
@@ -98,7 +113,7 @@ export default function MainCard({
       <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
           <Input
-            placeholder="https://github.com/username/repo"
+            placeholder="https://github.com/username/repo or https://dev.azure.com/org/project/_git/repo"
             className="flex-1 rounded-md border-[3px] border-black px-3 py-4 text-base font-bold shadow-[4px_4px_0_0_#000000] placeholder:text-base placeholder:font-normal placeholder:text-gray-700 sm:px-4 sm:py-6 sm:text-lg sm:placeholder:text-lg"
             value={repoUrl}
             onChange={(e) => setRepoUrl(e.target.value)}
