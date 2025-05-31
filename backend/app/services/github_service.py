@@ -232,3 +232,10 @@ class GitHubService:
         data = response.json()
         readme_content = requests.get(data["download_url"]).text
         return readme_content
+
+    # Alias methods for provider-agnostic usage
+    def get_repo_file_paths_as_list(self, username, repo):
+        return self.get_github_file_paths_as_list(username, repo)
+
+    def get_repo_readme(self, username, repo):
+        return self.get_github_readme(username, repo)

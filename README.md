@@ -12,6 +12,7 @@ You can also replace `hub` with `diagram` in any Github URL to access its diagra
 ## 🚀 Features
 
 - 👀 **Instant Visualization**: Convert any GitHub repository structure into a system design / architecture diagram
+- 💙 **Azure Support**: Works with Azure DevOps repositories using the same workflow
 - 🎨 **Interactivity**: Click on components to navigate directly to source files and relevant directories
 - ⚡ **Fast Generation**: Powered by OpenAI o4-mini for quick and accurate diagrams
 - 🔄 **Customization**: Modify and regenerate diagrams with custom instructions

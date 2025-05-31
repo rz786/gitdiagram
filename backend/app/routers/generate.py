@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from app.services.github_service import GitHubService
+from app.services.azure_service import AzureDevOpsService
 from app.services.o4_mini_openai_service import OpenAIo4Service
 from app.prompts import (
     SYSTEM_FIRST_PROMPT,
@@ -28,18 +29,26 @@ router = APIRouter(prefix="/generate", tags=["OpenAI o4-mini"])
 o4_service = OpenAIo4Service()
 
 
-# cache github data to avoid double API calls from cost and generate
+# cache repo data to avoid double API calls from cost and generate
 @lru_cache(maxsize=100)
-def get_cached_github_data(username: str, repo: str, github_pat: str | None = None):
-    # Create a new service instance for each call with the appropriate PAT
-    current_github_service = GitHubService(pat=github_pat)
+def get_cached_repo_data(
+    provider: str,
+    username: str,
+    repo: str,
+    github_pat: str | None = None,
+    azure_pat: str | None = None,
+):
+    if provider == "azure":
+        service = AzureDevOpsService(pat=azure_pat)
+    else:
+        service = GitHubService(pat=github_pat)
 
-    default_branch = current_github_service.get_default_branch(username, repo)
+    default_branch = service.get_default_branch(username, repo)
     if not default_branch:
         default_branch = "main"  # fallback value
 
-    file_tree = current_github_service.get_github_file_paths_as_list(username, repo)
-    readme = current_github_service.get_github_readme(username, repo)
+    file_tree = service.get_repo_file_paths_as_list(username, repo)
+    readme = service.get_repo_readme(username, repo)
 
     return {"default_branch": default_branch, "file_tree": file_tree, "readme": readme}
 
@@ -47,9 +56,11 @@ def get_cached_github_data(username: str, repo: str, github_pat: str | None = No
 class ApiRequest(BaseModel):
     username: str
     repo: str
+    provider: str = "github"
     instructions: str = ""
     api_key: str | None = None
     github_pat: str | None = None
+    azure_pat: str | None = None
 
 
 @router.post("/cost")
@@ -57,9 +68,15 @@ class ApiRequest(BaseModel):
 async def get_generation_cost(request: Request, body: ApiRequest):
     try:
         # Get file tree and README content
-        github_data = get_cached_github_data(body.username, body.repo, body.github_pat)
-        file_tree = github_data["file_tree"]
-        readme = github_data["readme"]
+        repo_data = get_cached_repo_data(
+            body.provider,
+            body.username,
+            body.repo,
+            body.github_pat,
+            body.azure_pat,
+        )
+        file_tree = repo_data["file_tree"]
+        readme = repo_data["readme"]
 
         # Calculate combined token count
         # file_tree_tokens = claude_service.count_tokens(file_tree)
@@ -90,7 +107,9 @@ async def get_generation_cost(request: Request, body: ApiRequest):
         return {"error": str(e)}
 
 
-def process_click_events(diagram: str, username: str, repo: str, branch: str) -> str:
+def process_click_events(
+    diagram: str, provider: str, username: str, repo: str, branch: str
+) -> str:
     """
     Process click events in Mermaid diagram to include full GitHub URLs.
     Detects if path is file or directory and uses appropriate URL format.
@@ -103,10 +122,18 @@ def process_click_events(diagram: str, username: str, repo: str, branch: str) ->
         # Determine if path is likely a file (has extension) or directory
         is_file = "." in path.split("/")[-1]
 
-        # Construct GitHub URL
-        base_url = f"https://github.com/{username}/{repo}"
-        path_type = "blob" if is_file else "tree"
-        full_url = f"{base_url}/{path_type}/{branch}/{path}"
+        if provider == "azure":
+            base = f"https://dev.azure.com/{username}/{repo}/_git/{repo}"
+            if is_file:
+                full_url = f"{base}?path={path}&version=GB{branch}"
+            else:
+                full_url = (
+                    f"{base}?path={path}&version=GB{branch}&_a=contents"
+                )
+        else:
+            base_url = f"https://github.com/{username}/{repo}"
+            path_type = "blob" if is_file else "tree"
+            full_url = f"{base_url}/{path_type}/{branch}/{path}"
 
         # Return the full click event with the new URL
         return f'click {match.group(1)} "{full_url}"'
@@ -134,13 +161,17 @@ async def generate_stream(request: Request, body: ApiRequest):
 
         async def event_generator():
             try:
-                # Get cached github data
-                github_data = get_cached_github_data(
-                    body.username, body.repo, body.github_pat
+                # Get cached repository data
+                repo_data = get_cached_repo_data(
+                    body.provider,
+                    body.username,
+                    body.repo,
+                    body.github_pat,
+                    body.azure_pat,
                 )
-                default_branch = github_data["default_branch"]
-                file_tree = github_data["file_tree"]
-                readme = github_data["readme"]
+                default_branch = repo_data["default_branch"]
+                file_tree = repo_data["file_tree"]
+                readme = repo_data["readme"]
 
                 # Send initial status
                 yield f"data: {json.dumps({'status': 'started', 'message': 'Starting generation process...'})}\n\n"
@@ -243,7 +274,11 @@ async def generate_stream(request: Request, body: ApiRequest):
                     return
 
                 processed_diagram = process_click_events(
-                    mermaid_code, body.username, body.repo, default_branch
+                    mermaid_code,
+                    body.provider,
+                    body.username,
+                    body.repo,
+                    default_branch,
                 )
 
                 # Send final result

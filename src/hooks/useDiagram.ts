@@ -39,7 +39,7 @@ interface StreamResponse {
   error?: string;
 }
 
-export function useDiagram(username: string, repo: string) {
+export function useDiagram(username: string, repo: string, provider = "github") {
   const [diagram, setDiagram] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
@@ -56,7 +56,7 @@ export function useDiagram(username: string, repo: string) {
   );
 
   const generateDiagram = useCallback(
-    async (instructions = "", githubPat?: string) => {
+    async (instructions = "", pat?: string) => {
       setState({
         status: "started",
         message: "Starting generation process...",
@@ -73,9 +73,11 @@ export function useDiagram(username: string, repo: string) {
           body: JSON.stringify({
             username,
             repo,
+            provider,
             instructions,
             api_key: localStorage.getItem("openai_key") ?? undefined,
-            github_pat: githubPat,
+            github_pat: provider === "github" ? pat : undefined,
+            azure_pat: provider === "azure" ? pat : undefined,
           }),
         });
         if (!response.ok) {
@@ -257,7 +259,10 @@ export function useDiagram(username: string, repo: string) {
     try {
       // Check cache first - always allow access to cached diagrams
       const cached = await getCachedDiagram(username, repo);
-      const github_pat = localStorage.getItem("github_pat");
+      const pat =
+        provider === "github"
+          ? localStorage.getItem("github_pat")
+          : localStorage.getItem("azure_pat");
 
       if (cached) {
         setDiagram(cached);
@@ -281,8 +286,9 @@ export function useDiagram(username: string, repo: string) {
       const costEstimate = await getCostOfGeneration(
         username,
         repo,
+        provider,
         "",
-        github_pat ?? undefined,
+        pat ?? undefined,
       );
 
       if (costEstimate.error) {
@@ -298,7 +304,7 @@ export function useDiagram(username: string, repo: string) {
       setCost(costEstimate.cost ?? "");
 
       // Start streaming generation
-      await generateDiagram("", github_pat ?? undefined);
+      await generateDiagram("", pat ?? undefined);
 
       // Note: The diagram and lastGenerated will be set by the generateDiagram function
       // through the state updates
@@ -350,7 +356,10 @@ export function useDiagram(username: string, repo: string) {
     setError("");
     setCost("");
     try {
-      const github_pat = localStorage.getItem("github_pat");
+      const pat =
+        provider === "github"
+          ? localStorage.getItem("github_pat")
+          : localStorage.getItem("azure_pat");
 
       // TEMP: LET USERS HAVE INFINITE GENERATIONS
       // const storedApiKey = localStorage.getItem("openai_key");
@@ -364,7 +373,13 @@ export function useDiagram(username: string, repo: string) {
       //   return;
       // }
 
-      const costEstimate = await getCostOfGeneration(username, repo, "");
+      const costEstimate = await getCostOfGeneration(
+        username,
+        repo,
+        provider,
+        "",
+        pat ?? undefined,
+      );
 
       if (costEstimate.error) {
         console.error("Cost estimation failed:", costEstimate.error);
@@ -375,7 +390,7 @@ export function useDiagram(username: string, repo: string) {
       setCost(costEstimate.cost ?? "");
 
       // Start streaming generation with instructions
-      await generateDiagram(instructions, github_pat ?? undefined);
+      await generateDiagram(instructions, pat ?? undefined);
     } catch (error) {
       console.error("Error regenerating diagram:", error);
       setError("Failed to regenerate diagram. Please try again later.");
@@ -447,9 +462,12 @@ export function useDiagram(username: string, repo: string) {
     localStorage.setItem("openai_key", apiKey);
 
     // Then generate diagram using stored key
-    const github_pat = localStorage.getItem("github_pat");
+    const pat =
+      provider === "github"
+        ? localStorage.getItem("github_pat")
+        : localStorage.getItem("azure_pat");
     try {
-      await generateDiagram("", github_pat ?? undefined);
+      await generateDiagram("", pat ?? undefined);
     } catch (error) {
       console.error("Error generating with API key:", error);
       setError("Failed to generate diagram with provided API key.");

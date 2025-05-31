@@ -28,6 +28,7 @@ export function Header() {
   const handlePrivateReposSubmit = (pat: string) => {
     // Store the PAT in localStorage
     localStorage.setItem("github_pat", pat);
+    localStorage.setItem("azure_pat", pat);
     setIsPrivateReposDialogOpen(false);
   };
 
